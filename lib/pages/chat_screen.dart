@@ -46,7 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void scrollDown() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
-        0.0,
+        _scrollController.position.maxScrollExtent,  // Scroll to bottom since list is reversed
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
@@ -57,7 +57,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_messageController.text.isNotEmpty) {
       await _chatService.sendMessage(widget.receivedId, _messageController.text);
       _messageController.clear();
-      scrollDown();
+
+      // Wait for frame to update then scroll down
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        scrollDown();
+      });
     }
   }
 
@@ -102,8 +106,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildMessageList() {
     String senderId = _authService.getCurrentUser()!.uid;
-    return StreamBuilder(
-      stream: _chatService.getMessages(widget.receivedId, senderId),
+    return StreamBuilder<QuerySnapshot>(
+      stream: _chatService.getMessages(senderId, widget.receivedId),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(

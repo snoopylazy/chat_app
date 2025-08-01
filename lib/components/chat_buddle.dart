@@ -14,6 +14,7 @@ class ChatBuddle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Access dark mode from your theme provider if needed (currently not used for colors)
     bool isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
 
     return Container(
@@ -53,7 +54,7 @@ class ChatBuddle extends StatelessWidget {
                 ? Theme.of(context).colorScheme.onPrimary
                 : Theme.of(context).colorScheme.onSurface,
             fontSize: 16,
-            fontWeight: FontWeight.w400,
+            fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.w400,
           ),
         ),
       ),

@@ -1,10 +1,9 @@
-import 'package:chat_app/components/user_tile.dart';
+import 'package:chat_app/components/my_drawer.dart';
 import 'package:chat_app/pages/chat_screen.dart';
 import 'package:chat_app/services/auth/auth_service.dart';
-import 'package:chat_app/components/my_drawer.dart';
 import 'package:chat_app/services/chats/chat_service.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,35 +17,63 @@ class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
   User? _currentUser;
 
+  bool _isSearching = false; // toggle search bar visibility
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
     _currentUser = _authService.getCurrentUser();
   }
 
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchQuery = '';
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: !_isSearching
+            ? const Text(
           "Messages",
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
           ),
+        )
+            : TextField(
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: "Search users...",
+            border: InputBorder.none,
+            hintStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 18,
+          ),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value.trim().toLowerCase();
+            });
+          },
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Theme.of(context).colorScheme.onSurface,
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.search,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            onPressed: () {
-              // Add search functionality later
-            },
+            icon: Icon(_isSearching ? Icons.close : Icons.search,
+                color: Theme.of(context).colorScheme.primary),
+            onPressed: _toggleSearch,
           ),
         ],
       ),
@@ -65,108 +92,38 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildUserList() {
-    return StreamBuilder(
+    return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _chatService.getUsersStream(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Something went wrong",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Error: ${snapshot.error}",
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
+          return _buildErrorWidget(snapshot.error.toString());
         }
-
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  "Loading users...",
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _buildLoadingWidget();
         }
-
         if (!snapshot.hasData) {
-          return Center(
-            child: Text(
-              "No data available",
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-          );
+          return _buildNoDataWidget("No data available");
         }
 
-        final users = snapshot.data as List<Map<String, dynamic>>;
+        final users = snapshot.data!;
         final filteredUsers = users.where((userData) {
-          final userEmail = userData['email'] ?? '';
-          return _currentUser != null && userEmail != _currentUser!.email && userEmail.isNotEmpty;
+          final userEmail = (userData['email'] ?? '').toString().toLowerCase();
+          final userName = userEmail.split('@').first;
+
+          // Skip current user
+          if (_currentUser == null || userEmail == _currentUser!.email?.toLowerCase()) {
+            return false;
+          }
+
+          if (_searchQuery.isEmpty) {
+            return true;
+          }
+
+          return userEmail.contains(_searchQuery) || userName.contains(_searchQuery);
         }).toList();
 
         if (filteredUsers.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.people_outline,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  "No users found",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "Ask your friends to register!",
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                    fontSize: 16,
-                  ),
-                ),
-              ],
-            ),
-          );
+          return _buildNoDataWidget("No users found.");
         }
 
         return ListView.separated(
@@ -187,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildUserListItem(Map<String, dynamic> userData) {
     final userEmail = userData['email'] ?? '';
-    final userName = userEmail.split('@')[0]; // Get username part of email
+    final userName = userEmail.split('@')[0];
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -238,6 +195,90 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Something went wrong",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Loading users...",
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoDataWidget(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.people_outline,
+            size: 80,
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Ask your friends to register!",
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              fontSize: 16,
+            ),
+          ),
+        ],
       ),
     );
   }
