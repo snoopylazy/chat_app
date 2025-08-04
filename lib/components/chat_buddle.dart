@@ -7,15 +7,46 @@ class ChatBuddle extends StatelessWidget {
     super.key,
     required this.message,
     required this.isCurrentUser,
+    this.isDeleted = false,
+    this.removedBy,
   });
 
   final String message;
   final bool isCurrentUser;
 
+  /// New: Whether this message was deleted
+  final bool isDeleted;
+
+  /// New: Who removed this message (can be email or username)
+  final String? removedBy;
+
   @override
   Widget build(BuildContext context) {
-    // Access dark mode from your theme provider if needed (currently not used for colors)
     bool isDarkMode = Provider.of<ThemeProvider>(context, listen: false).isDarkMode;
+
+    if (isDeleted) {
+      return Container(
+        alignment: Alignment.center,
+        margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey),
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.grey.shade200,
+        ),
+        child: Text(
+          removedBy != null && removedBy!.isNotEmpty
+              ? "Message removed by $removedBy"
+              : "Message has been removed",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontStyle: FontStyle.italic,
+            color: Colors.grey.shade600,
+            fontSize: 14,
+          ),
+        ),
+      );
+    }
 
     return Container(
       alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -32,12 +63,10 @@ class ChatBuddle extends StatelessWidget {
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
-            bottomLeft: isCurrentUser
-                ? const Radius.circular(16)
-                : const Radius.circular(4),
-            bottomRight: isCurrentUser
-                ? const Radius.circular(4)
-                : const Radius.circular(16),
+            bottomLeft:
+            isCurrentUser ? const Radius.circular(16) : const Radius.circular(4),
+            bottomRight:
+            isCurrentUser ? const Radius.circular(4) : const Radius.circular(16),
           ),
           boxShadow: [
             BoxShadow(

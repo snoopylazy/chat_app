@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class MyTextfield extends StatelessWidget {
+class MyTextfield extends StatefulWidget {
   final String hintText;
   final bool obscureText;
   final TextEditingController? controller;
@@ -15,13 +15,26 @@ class MyTextfield extends StatelessWidget {
   });
 
   @override
+  State<MyTextfield> createState() => _MyTextfieldState();
+}
+
+class _MyTextfieldState extends State<MyTextfield> {
+  late bool _obscure;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscure = widget.obscureText;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25.0),
       child: TextField(
-        obscureText: obscureText, // Use the obscureText parameter
-        controller: controller,
-        focusNode: focusNode,
+        obscureText: _obscure,
+        controller: widget.controller,
+        focusNode: widget.focusNode,
         style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         decoration: InputDecoration(
           enabledBorder: OutlineInputBorder(
@@ -40,14 +53,24 @@ class MyTextfield extends StatelessWidget {
           ),
           fillColor: Theme.of(context).colorScheme.surface,
           filled: true,
-          hintText: hintText,
+          hintText: widget.hintText,
           hintStyle: TextStyle(
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 16,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          suffixIcon: widget.obscureText
+              ? IconButton(
+            icon: Icon(
+              _obscure ? Icons.visibility_off : Icons.visibility,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            ),
+            onPressed: () {
+              setState(() {
+                _obscure = !_obscure;
+              });
+            },
+          )
+              : null,
         ),
       ),
     );

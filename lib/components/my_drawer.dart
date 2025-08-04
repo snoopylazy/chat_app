@@ -12,20 +12,50 @@ class MyDrawer extends StatelessWidget {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Logout'),
-          content: const Text('Are you sure you want to logout?'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.logout, color: Colors.red),
+              SizedBox(width: 10),
+              Text(
+                'Logout',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(fontSize: 16),
+          ),
+          actionsPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(fontSize: 16),
+              ),
             ),
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop(true),
+              icon: const Icon(Icons.logout),
+              label: const Text(
+                'Logout',
+                style: TextStyle(fontSize: 16),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
-              child: const Text('Logout'),
             ),
           ],
         );
@@ -39,7 +69,10 @@ class MyDrawer extends StatelessWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error logging out: $e')),
+            SnackBar(
+              content: Text('Error logging out: $e'),
+              backgroundColor: Colors.red[400],
+            ),
           );
         }
       }
