@@ -55,13 +55,103 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  // Show dialog to add new user
+  void _showAddUserDialog() {
+    final TextEditingController emailController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add User to Chat'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter the email address of the user you want to chat with:'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => _addUserToChat(emailController.text.trim()),
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Add user to chat list
+  Future<void> _addUserToChat(String email) async {
+    if (email.isEmpty) {
+      _showSnackBar('Please enter an email address', isError: true);
+      return;
+    }
+
+    if (email.toLowerCase() == _currentUser?.email?.toLowerCase()) {
+      _showSnackBar('You cannot add yourself to chat', isError: true);
+      return;
+    }
+
+    try {
+      Navigator.of(context).pop(); // Close dialog
+
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      final result = await _chatService.addUserToChat(email);
+
+      Navigator.of(context).pop(); // Close loading
+
+      if (result['success']) {
+        _showSnackBar('User added successfully!');
+      } else {
+        _showSnackBar(result['message'], isError: true);
+      }
+    } catch (e) {
+      Navigator.of(context).pop(); // Close loading
+      _showSnackBar('Error adding user: $e', isError: true);
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: !_isSearching
             ? const Text(
-          "Messages",
+          "ChitChat",
           style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
         )
             : TextField(
@@ -101,6 +191,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
       drawer: const MyDrawer(),
       backgroundColor: Theme.of(context).colorScheme.surface,
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddUserDialog,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        child: const Icon(Icons.person_add),
+      ),
       body: Column(
         children: [
           Container(
@@ -115,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildUserList() {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _chatService.getUsersStream(),
+      stream: _chatService.getChatUsersStream(), // Changed to only show chat users
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return _buildErrorWidget(snapshot.error.toString());
@@ -144,7 +240,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }).toList();
 
         if (filteredUsers.isEmpty) {
-          return _buildNoDataWidget("No users found.");
+          return _buildNoDataWidget(_searchQuery.isEmpty
+              ? "No chat users yet.\nTap the + button to add someone!"
+              : "No users found.");
         }
 
         return ListView.separated(
@@ -497,15 +595,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.onSurface,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          Text(
-            "Ask your friends to register!",
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              fontSize: 16,
+          if (message.contains("No chat users yet"))
+            Text(
+              "Use the + button to add users to chat with",
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                fontSize: 16,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
         ],
       ),
     );

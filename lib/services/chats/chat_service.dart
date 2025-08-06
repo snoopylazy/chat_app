@@ -15,6 +15,104 @@ class ChatService {
     });
   }
 
+  // **NEW METHOD**: Get only users that current user has chatted with
+  Stream<List<Map<String, dynamic>>> getChatUsersStream() {
+    final String currentUserId = _auth.currentUser!.uid;
+
+    return _firestore
+        .collection('ChatRooms')
+        .where('participants', arrayContains: currentUserId)
+        .snapshots()
+        .asyncExpand((chatRoomsSnapshot) {
+
+      if (chatRoomsSnapshot.docs.isEmpty) {
+        return Stream.value(<Map<String, dynamic>>[]);
+      }
+
+      // Get all other user IDs from chat rooms
+      Set<String> otherUserIds = {};
+      for (var doc in chatRoomsSnapshot.docs) {
+        List<String> participants = List<String>.from(doc.data()['participants'] ?? []);
+        for (String userId in participants) {
+          if (userId != currentUserId) {
+            otherUserIds.add(userId);
+          }
+        }
+      }
+
+      if (otherUserIds.isEmpty) {
+        return Stream.value(<Map<String, dynamic>>[]);
+      }
+
+      // Get user details for all other users
+      return _firestore
+          .collection('Users')
+          .where('uid', whereIn: otherUserIds.toList())
+          .snapshots()
+          .map((userSnapshot) {
+        return userSnapshot.docs.map((doc) => doc.data()).toList();
+      });
+    });
+  }
+
+  // **NEW METHOD**: Add user to chat list
+  Future<Map<String, dynamic>> addUserToChat(String email) async {
+    try {
+      final String currentUserId = _auth.currentUser!.uid;
+
+      // Check if user exists
+      final userQuery = await _firestore
+          .collection('Users')
+          .where('email', isEqualTo: email.toLowerCase())
+          .limit(1)
+          .get();
+
+      if (userQuery.docs.isEmpty) {
+        return {
+          'success': false,
+          'message': 'User with email "$email" not found. Make sure they have an account.'
+        };
+      }
+
+      final otherUserId = userQuery.docs.first.id;
+
+      // Check if already in chat list
+      final ids = [currentUserId, otherUserId]..sort();
+      final chatRoomId = ids.join('_');
+
+      final existingChatRoom = await _firestore
+          .collection('ChatRooms')
+          .doc(chatRoomId)
+          .get();
+
+      if (existingChatRoom.exists) {
+        return {
+          'success': false,
+          'message': 'You are already connected with this user.'
+        };
+      }
+
+      // Create chat room
+      await _firestore.collection('ChatRooms').doc(chatRoomId).set({
+        'participants': ids,
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': currentUserId,
+        'lastActivity': FieldValue.serverTimestamp(),
+      });
+
+      return {
+        'success': true,
+        'message': 'User added successfully!'
+      };
+
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error adding user: ${e.toString()}'
+      };
+    }
+  }
+
   Future<void> sendMessage(String receiverId, message) async {
     final String currentUserID = _auth.currentUser!.uid;
     final String currentUserEmail = _auth.currentUser!.email!;
@@ -31,6 +129,12 @@ class ChatService {
     List<String> ids = [currentUserID, receiverId];
     ids.sort();
     String chatRoomId = ids.join('_');
+
+    // Ensure chat room exists with participants
+    await _firestore.collection('ChatRooms').doc(chatRoomId).set({
+      'participants': ids,
+      'lastActivity': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
     // Send the message
     await _firestore
