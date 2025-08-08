@@ -5,6 +5,7 @@ import 'package:chat_app/services/auth/auth_service.dart';
 import 'package:chat_app/services/chats/chat_service.dart';
 import 'package:chat_app/modals/chat_room.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:chat_app/gen_l10n/app_localizations.dart';
@@ -361,6 +362,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       Navigator.of(context).pop();
 
       if (result['success']) {
+        setState(() {});
         _showSnackBar(AppLocalizations.of(context)!.userAddedSuccessfully);
       } else {
         _showSnackBar(result['message'], isError: true);
@@ -411,6 +413,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       Navigator.of(context).pop();
 
       if (result['success']) {
+        setState(() {});
         _showSnackBar(
           AppLocalizations.of(context)!.groupChatCreatedSuccessfully,
         );
@@ -586,6 +589,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildUserList() {
     return StreamBuilder<List<Map<String, dynamic>>>(
+      key: ValueKey(
+        'user_list_${_currentUser?.uid}_${_searchQuery}_${DateTime.now().millisecondsSinceEpoch ~/ 30000}',
+      ),
       stream: _chatService.getChatUsersStream(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -653,6 +659,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildGroupList() {
     return StreamBuilder<List<ChatRoom>>(
+      key: ValueKey(
+        'group_list_${_currentUser?.uid}_${_searchQuery}_${DateTime.now().millisecondsSinceEpoch ~/ 30000}',
+      ),
       stream: _chatService.getGroupChatRoomsStream(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -712,6 +721,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                         );
                       },
+                      onLongPress: () =>
+                          _onGroupLongPress(filteredGroups[index]),
                     ),
                   ),
                 ),
@@ -885,10 +896,323 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               );
             },
+            onLongPress: () => _onDirectChatLongPress(otherUserId, userEmail),
           ),
         );
       },
     );
+  }
+
+  void _onDirectChatLongPress(String otherUserId, String userEmail) async {
+    final String? choice = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                alignment: Alignment.center,
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.redAccent,
+                  child: Icon(Icons.delete_outline, color: Colors.white),
+                ),
+                title: Text(
+                  AppLocalizations.of(context)!.delete,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(AppLocalizations.of(context)!.clearChat),
+                onTap: () => Navigator.pop(context, 'hide'),
+              ),
+              const SizedBox(height: 4),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.secondary,
+                  child: const Icon(Icons.close),
+                ),
+                title: Text(AppLocalizations.of(context)!.cancel),
+                onTap: () => Navigator.pop(context, 'cancel'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (choice == 'hide') {
+      await _chatService.hideDirectChatWithUser(otherUserId);
+      _showSnackBar('${AppLocalizations.of(context)!.clearChat} - $userEmail');
+      setState(() {});
+    }
+  }
+
+  void _onGroupLongPress(ChatRoom room) async {
+    final String currentUserId = _authService.getCurrentUser()!.uid;
+    final bool isCreator = room.createdBy == currentUserId;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                alignment: Alignment.center,
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              if (isCreator)
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.15),
+                    child: Icon(
+                      Icons.person_add,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  title: const Text('Add members'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _showAddMembersDialog(room.id);
+                  },
+                ),
+              if (isCreator)
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.orange.withOpacity(0.15),
+                    child: const Icon(
+                      Icons.person_remove,
+                      color: Colors.orange,
+                    ),
+                  ),
+                  title: const Text('Remove member'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _showRemoveMemberDialog(room);
+                  },
+                ),
+              if (isCreator)
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFFFEBEE),
+                    child: Icon(Icons.delete_forever, color: Colors.redAccent),
+                  ),
+                  title: const Text('Delete group'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete group'),
+                        content: const Text(
+                          'Are you sure you want to delete this group? This action cannot be undone.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: Text(AppLocalizations.of(context)!.cancel),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: Text(AppLocalizations.of(context)!.delete),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true) {
+                      final res = await _chatService.deleteGroupChat(room.id);
+                      _showSnackBar(res['message'] ?? '');
+                    }
+                  },
+                ),
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.secondary,
+                  child: const Icon(Icons.close),
+                ),
+                title: Text(AppLocalizations.of(context)!.cancel),
+                onTap: () => Navigator.pop(context),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showAddMembersDialog(String chatRoomId) async {
+    final TextEditingController emailsController = TextEditingController();
+    final List<String>? result = await showDialog<List<String>>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add members'),
+          content: TextField(
+            controller: emailsController,
+            decoration: const InputDecoration(
+              hintText: 'Enter emails separated by commas',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final emails = emailsController.text
+                    .split(',')
+                    .map((e) => e.trim().toLowerCase())
+                    .where((e) => e.isNotEmpty)
+                    .toList();
+                Navigator.pop(context, emails);
+              },
+              child: Text(AppLocalizations.of(context)!.add),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null && result.isNotEmpty) {
+      final res = await _chatService.addMembersToGroupByEmails(
+        chatRoomId,
+        result,
+      );
+      _showSnackBar(res['message'] ?? '');
+    }
+  }
+
+  Future<void> _showRemoveMemberDialog(ChatRoom room) async {
+    final String currentUserId = _authService.getCurrentUser()!.uid;
+    final members = room.participants
+        .where((id) => id != currentUserId)
+        .toList();
+
+    // Resolve member emails for display
+    final Map<String, String> uidToEmail = {};
+    if (members.isNotEmpty) {
+      final usersSnap = await FirebaseFirestore.instance
+          .collection('Users')
+          .where('uid', whereIn: members)
+          .get();
+      for (final doc in usersSnap.docs) {
+        final data = doc.data();
+        final uid = (data['uid'] as String?) ?? doc.id;
+        final email = (data['email'] as String?) ?? '';
+        uidToEmail[uid] = email;
+      }
+    }
+
+    final String? selected = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.person_remove, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Remove member',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: members.length,
+                  itemBuilder: (context, index) {
+                    final userId = members[index];
+                    final email = uidToEmail[userId] ?? userId;
+                    final name = email.split('@').first;
+                    return ListTile(
+                      leading: CircleAvatar(
+                        child: Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        ),
+                      ),
+                      title: Text(name),
+                      subtitle: Text(email),
+                      trailing: const Icon(
+                        Icons.remove_circle_outline,
+                        color: Colors.redAccent,
+                      ),
+                      onTap: () => Navigator.pop(context, userId),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
+                label: Text(AppLocalizations.of(context)!.cancel),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected != null && selected.isNotEmpty) {
+      final res = await _chatService.removeMemberFromGroup(room.id, selected);
+      _showSnackBar(res['message'] ?? '');
+    }
   }
 
   Widget _buildUserAvatar(

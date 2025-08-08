@@ -1,7 +1,5 @@
-import 'package:chat_app/themes/theme_provider.dart';
 import 'package:chat_app/modals/message.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -13,12 +11,16 @@ class ChatBuddle extends StatelessWidget {
     this.isDeleted = false,
     this.removedBy,
     this.timestamp,
+    this.deletedAt,
+    this.editedAt,
     this.status = MessageStatus.sent,
     this.isEdited = false,
     this.onEdit,
     this.onDelete,
     this.onReply,
     this.replyToMessage,
+    this.replyToMessageSender,
+    this.replyToSenderEmail,
   });
 
   final String message;
@@ -26,19 +28,23 @@ class ChatBuddle extends StatelessWidget {
   final bool isDeleted;
   final String? removedBy;
   final Timestamp? timestamp;
+  final Timestamp? deletedAt;
+  final Timestamp? editedAt;
   final MessageStatus status;
   final bool isEdited;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onReply;
   final String? replyToMessage;
+  final String? replyToMessageSender;
+  final String? replyToSenderEmail;
 
   @override
   Widget build(BuildContext context) {
-    bool isDarkMode = Provider.of<ThemeProvider>(
-      context,
-      listen: false,
-    ).isDarkMode;
+    // bool isDarkMode = Provider.of<ThemeProvider>(
+    //   context,
+    //   listen: false,
+    // ).isDarkMode;
 
     if (isDeleted) {
       return Container(
@@ -50,16 +56,28 @@ class ChatBuddle extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           color: Colors.grey.shade200,
         ),
-        child: Text(
-          removedBy != null && removedBy!.isNotEmpty
-              ? "Message removed by $removedBy"
-              : "Message has been removed",
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontStyle: FontStyle.italic,
-            color: Colors.grey.shade600,
-            fontSize: 14,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              removedBy != null && removedBy!.isNotEmpty
+                  ? "Message removed by $removedBy"
+                  : "Message has been removed",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
+            if (deletedAt != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Deleted • ${_formatTimestamp(deletedAt!)}',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              ),
+            ],
+          ],
         ),
       );
     }
@@ -132,6 +150,65 @@ class ChatBuddle extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Quoted reply content inside bubble
+                if (replyToMessage != null && replyToMessage!.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 28,
+                          margin: const EdgeInsets.only(right: 8, top: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if ((replyToMessageSender ??
+                                      replyToSenderEmail ??
+                                      '')
+                                  .isNotEmpty)
+                                Text(
+                                  (replyToMessageSender ?? replyToSenderEmail)!
+                                      .split('@')
+                                      .first,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.7),
+                                  ),
+                                ),
+                              Text(
+                                replyToMessage!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.8),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 // Message text
                 Text(
                   message,
@@ -151,7 +228,9 @@ class ChatBuddle extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      'edited',
+                      editedAt != null
+                          ? 'edited • ${_formatTimestamp(editedAt!)}'
+                          : 'edited',
                       style: TextStyle(
                         color: isCurrentUser
                             ? Theme.of(

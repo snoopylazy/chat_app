@@ -1,9 +1,7 @@
 import 'package:chat_app/modals/chat_room.dart';
 import 'package:chat_app/services/auth/auth_service.dart';
-import 'package:chat_app/services/chats/chat_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 class GroupChatTile extends StatelessWidget {
   final ChatRoom chatRoom;

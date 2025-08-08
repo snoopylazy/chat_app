@@ -37,8 +37,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Set<String> _deletedMessages = {};
   bool _isTyping = false;
   Timer? _typingTimer;
-  String? _editingMessageId;
-  String? _editingMessageText;
+  String? _replyToMessageId;
+  String? _replyToMessageText;
+  String? _replyToMessageSenderEmail;
+  // String? _editingMessageId;
+  // String? _editingMessageText;
 
   @override
   void initState() {
@@ -124,9 +127,21 @@ class _ChatScreenState extends State<ChatScreen> {
         widget.receivedId,
         _messageController.text,
         chatRoomId: chatRoomId,
+        metadata: _replyToMessageSenderEmail == null
+            ? null
+            : {'replyToSenderEmail': _replyToMessageSenderEmail},
+        replyToMessageId: _replyToMessageId,
+        replyToMessageText: _replyToMessageText,
       );
 
       _messageController.clear();
+      setState(() {
+        _replyToMessageId = null;
+        _replyToMessageText = null;
+        _replyToMessageSenderEmail = null;
+      });
+      // Close keyboard
+      _focusNode.unfocus();
       _chatService.setTypingStatus(chatRoomId, false);
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -409,40 +424,40 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.search),
             onPressed: () => _showSearchDialog(),
           ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'clear':
-                  _clearChat();
-                  break;
-                case 'block':
-                  _blockUser();
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'clear',
-                child: Row(
-                  children: [
-                    Icon(Icons.clear_all),
-                    SizedBox(width: 8),
-                    Text(AppLocalizations.of(context)!.clearChat),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'block',
-                child: Row(
-                  children: [
-                    Icon(Icons.block),
-                    SizedBox(width: 8),
-                    Text(AppLocalizations.of(context)!.blockUser),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          // PopupMenuButton<String>(
+          //   onSelected: (value) {
+          //     switch (value) {
+          //       case 'clear':
+          //         _clearChat();
+          //         break;
+          //       case 'block':
+          //         _blockUser();
+          //         break;
+          //     }
+          //   },
+          //   itemBuilder: (context) => [
+          //     PopupMenuItem(
+          //       value: 'clear',
+          //       child: Row(
+          //         children: [
+          //           Icon(Icons.clear_all),
+          //           SizedBox(width: 8),
+          //           Text(AppLocalizations.of(context)!.clearChat),
+          //         ],
+          //       ),
+          //     ),
+          //     PopupMenuItem(
+          //       value: 'block',
+          //       child: Row(
+          //         children: [
+          //           Icon(Icons.block),
+          //           SizedBox(width: 8),
+          //           Text(AppLocalizations.of(context)!.blockUser),
+          //         ],
+          //       ),
+          //     ),
+          //   ],
+          // ),
         ],
       ),
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -567,9 +582,11 @@ class _ChatScreenState extends State<ChatScreen> {
       (e) => e.name == (data['status'] ?? 'sent'),
       orElse: () => MessageStatus.sent,
     );
-    final bool isEdited = data['isEdited'] ?? false;
+    final bool isEdited = (data['isEdited'] ?? false) == true;
     final Timestamp? timestamp = data['timestamp'];
+    final Timestamp? editedAt = data['editedAt'];
     final String? replyToMessageText = data['replyToMessageText'];
+    final String? replyToSender = data['senderEmail'];
 
     String? removedBy = data['deletedByEmail'];
     if (removedBy == null || removedBy.isEmpty) {
@@ -585,9 +602,15 @@ class _ChatScreenState extends State<ChatScreen> {
         isDeleted: isDeleted,
         removedBy: removedBy,
         timestamp: timestamp,
+        deletedAt: data['deletedAt'],
+        editedAt: editedAt,
         status: status,
         isEdited: isEdited,
         replyToMessage: replyToMessageText,
+        replyToMessageSender:
+            (replyToMessageText != null && replyToMessageText.isNotEmpty)
+            ? (replyToSender?.split('@').first ?? '')
+            : null,
       ),
     );
   }
@@ -599,13 +622,17 @@ class _ChatScreenState extends State<ChatScreen> {
   ) {
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      clipBehavior: Clip.antiAlias,
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (isCurrentUser && !data['deleted']) ...[
+              if (isCurrentUser && (data['deleted'] != true)) ...[
                 ListTile(
                   leading: const Icon(Icons.edit),
                   title: Text(AppLocalizations.of(context)!.edit),
@@ -628,7 +655,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 title: Text(AppLocalizations.of(context)!.reply),
                 onTap: () {
                   Navigator.pop(context);
-                  // TODO: Implement reply functionality
+                  setState(() {
+                    _replyToMessageId = doc.id;
+                    _replyToMessageText = data['message'] ?? '';
+                    _replyToMessageSenderEmail = data['senderEmail'] as String?;
+                  });
                 },
               ),
             ],
@@ -675,7 +706,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                '${typingUsers.keys.first} ${AppLocalizations.of(context)!.isTyping}',
+                '${typingUsers.keys.first} is typing...}',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(
@@ -712,33 +743,96 @@ class _ChatScreenState extends State<ChatScreen> {
               onPressed: () => _showAttachmentOptions(),
             ),
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: TextField(
-                  controller: _messageController,
-                  focusNode: _focusNode,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: AppLocalizations.of(context)!.typeAMessage,
-                    hintStyle: TextStyle(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_replyToMessageText != null &&
+                      _replyToMessageText!.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outline.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.reply,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _replyToMessageText!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withOpacity(0.8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              _replyToMessageId = null;
+                              _replyToMessageText = null;
+                            }),
+                            child: Icon(
+                              Icons.close,
+                              size: 16,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: TextField(
+                      controller: _messageController,
+                      focusNode: _focusNode,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: AppLocalizations.of(context)!.typeAMessage,
+                        hintStyle: TextStyle(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.6),
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      onSubmitted: (_) => sendMessage(),
+                      maxLines: null,
                     ),
                   ),
-                  onSubmitted: (_) => sendMessage(),
-                  maxLines: null,
-                ),
+                ],
               ),
             ),
             const SizedBox(width: 8),

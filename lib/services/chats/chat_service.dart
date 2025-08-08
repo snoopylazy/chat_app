@@ -41,6 +41,15 @@ class ChatService {
             List<String> participants = List<String>.from(
               doc.data()['participants'] ?? [],
             );
+            // Skip chats hidden by current user
+            final List<dynamic> hiddenForRaw =
+                (doc.data()['hiddenFor'] as List<dynamic>? ?? []);
+            final Set<String> hiddenFor = hiddenForRaw
+                .map((e) => e.toString())
+                .toSet();
+            if (hiddenFor.contains(currentUserId)) {
+              continue;
+            }
             for (String userId in participants) {
               if (userId != currentUserId) {
                 otherUserIds.add(userId);
@@ -128,6 +137,7 @@ class ChatService {
         'createdBy': currentUserId,
         'lastActivity': FieldValue.serverTimestamp(),
         'isActive': true,
+        'hiddenFor': [],
       });
 
       return {'success': true, 'message': 'User added successfully!'};
@@ -203,6 +213,8 @@ class ChatService {
     String? chatRoomId,
     MessageType type = MessageType.text,
     Map<String, dynamic>? metadata,
+    String? replyToMessageId,
+    String? replyToMessageText,
   }) async {
     final String currentUserID = _auth.currentUser!.uid;
     final String currentUserEmail = _auth.currentUser!.email!;
@@ -218,6 +230,8 @@ class ChatService {
       type: type,
       metadata: metadata,
       chatRoomId: chatRoomId,
+      replyToMessageId: replyToMessageId,
+      replyToMessageText: replyToMessageText,
     );
 
     String roomId = chatRoomId ?? getChatRoomId(currentUserID, receiverId);
@@ -526,6 +540,164 @@ class ChatService {
   String getChatRoomId(String userId1, String userId2) {
     final ids = [userId1, userId2]..sort();
     return ids.join('_');
+  }
+
+  // Hide a direct chat for the current user (remove from chat list)
+  Future<void> hideDirectChatWithUser(String otherUserId) async {
+    final String currentUserId = _auth.currentUser!.uid;
+    final String chatRoomId = getChatRoomId(currentUserId, otherUserId);
+
+    await _firestore.collection('ChatRooms').doc(chatRoomId).set({
+      'hiddenFor': FieldValue.arrayUnion([currentUserId]),
+      'lastActivity': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  // GROUP ADMIN: Add members to group by emails (creator only)
+  Future<Map<String, dynamic>> addMembersToGroupByEmails(
+    String chatRoomId,
+    List<String> participantEmails,
+  ) async {
+    try {
+      final String currentUserId = _auth.currentUser!.uid;
+      final roomRef = _firestore.collection('ChatRooms').doc(chatRoomId);
+      final roomSnap = await roomRef.get();
+      if (!roomSnap.exists) {
+        return {'success': false, 'message': 'Group not found'};
+      }
+      final data = roomSnap.data()!;
+      if (data['createdBy'] != currentUserId) {
+        return {
+          'success': false,
+          'message': 'Only the group creator can add members',
+        };
+      }
+
+      final Set<String> toAdd = {};
+      for (final email in participantEmails) {
+        final userQuery = await _firestore
+            .collection('Users')
+            .where('email', isEqualTo: email.toLowerCase())
+            .limit(1)
+            .get();
+        if (userQuery.docs.isNotEmpty) {
+          final userData = userQuery.docs.first.data();
+          final uid = (userData['uid'] as String?) ?? userQuery.docs.first.id;
+          toAdd.add(uid);
+        }
+      }
+
+      if (toAdd.isEmpty) {
+        return {'success': false, 'message': 'No valid users found to add'};
+      }
+
+      await roomRef.update({
+        'participants': FieldValue.arrayUnion(toAdd.toList()),
+        'lastActivity': FieldValue.serverTimestamp(),
+      });
+
+      return {'success': true, 'message': 'Members added'};
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error adding members: ${e.toString()}',
+      };
+    }
+  }
+
+  // GROUP ADMIN: Remove a member (creator only)
+  Future<Map<String, dynamic>> removeMemberFromGroup(
+    String chatRoomId,
+    String userId,
+  ) async {
+    try {
+      final String currentUserId = _auth.currentUser!.uid;
+      final roomRef = _firestore.collection('ChatRooms').doc(chatRoomId);
+      final roomSnap = await roomRef.get();
+      if (!roomSnap.exists) {
+        return {'success': false, 'message': 'Group not found'};
+      }
+      final data = roomSnap.data()!;
+      if (data['createdBy'] != currentUserId) {
+        return {
+          'success': false,
+          'message': 'Only the group creator can remove members',
+        };
+      }
+
+      await roomRef.update({
+        'participants': FieldValue.arrayRemove([userId]),
+        'lastActivity': FieldValue.serverTimestamp(),
+      });
+      return {'success': true, 'message': 'Member removed'};
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error removing member: ${e.toString()}',
+      };
+    }
+  }
+
+  // GROUP ADMIN: Delete group (creator only)
+  Future<Map<String, dynamic>> deleteGroupChat(String chatRoomId) async {
+    try {
+      final String currentUserId = _auth.currentUser!.uid;
+      final roomRef = _firestore.collection('ChatRooms').doc(chatRoomId);
+      final roomSnap = await roomRef.get();
+      if (!roomSnap.exists) {
+        return {'success': false, 'message': 'Group not found'};
+      }
+      final data = roomSnap.data()!;
+      if (data['createdBy'] != currentUserId) {
+        return {
+          'success': false,
+          'message': 'Only the group creator can delete the group',
+        };
+      }
+
+      // Delete messages in batches
+      final messagesRef = roomRef.collection('Messages');
+      while (true) {
+        final batchSnap = await messagesRef.limit(200).get();
+        if (batchSnap.docs.isEmpty) break;
+        final batch = _firestore.batch();
+        for (final doc in batchSnap.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+
+      // Delete read statuses
+      final readRef = roomRef.collection('ReadStatus');
+      final readSnap = await readRef.get();
+      if (readSnap.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in readSnap.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+
+      // Delete typing statuses
+      final typingRef = roomRef.collection('Typing');
+      final typingSnap = await typingRef.get();
+      if (typingSnap.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in typingSnap.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+
+      // Delete the room
+      await roomRef.delete();
+      return {'success': true, 'message': 'Group deleted'};
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Error deleting group: ${e.toString()}',
+      };
+    }
   }
 
   // Dispose resources

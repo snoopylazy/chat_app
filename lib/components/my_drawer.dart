@@ -1,5 +1,6 @@
 import 'package:chat_app/services/auth/auth_service.dart';
 import 'package:chat_app/pages/settings_screen.dart';
+import 'package:chat_app/pages/stub_screen.dart';
 import 'package:chat_app/providers/language_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -131,7 +132,15 @@ class MyDrawer extends StatelessWidget {
                         title: AppLocalizations.of(context)!.profile,
                         onTap: () {
                           Navigator.pop(context);
-                          // TODO: Navigate to profile screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const StubScreen(
+                                title: 'Profile',
+                                icon: Icons.person_outline,
+                              ),
+                            ),
+                          );
                         },
                       ),
                       _buildDrawerItem(
@@ -154,7 +163,15 @@ class MyDrawer extends StatelessWidget {
                         title: AppLocalizations.of(context)!.notifications,
                         onTap: () {
                           Navigator.pop(context);
-                          // TODO: Navigate to notifications screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const StubScreen(
+                                title: 'Notifications',
+                                icon: Icons.notifications_outlined,
+                              ),
+                            ),
+                          );
                         },
                       ),
                       _buildDrawerItem(
@@ -182,7 +199,15 @@ class MyDrawer extends StatelessWidget {
                         title: AppLocalizations.of(context)!.helpSupport,
                         onTap: () {
                           Navigator.pop(context);
-                          // TODO: Navigate to help screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const StubScreen(
+                                title: 'Help & Support',
+                                icon: Icons.help_outline,
+                              ),
+                            ),
+                          );
                         },
                       ),
                       _buildDrawerItem(
@@ -191,7 +216,15 @@ class MyDrawer extends StatelessWidget {
                         title: AppLocalizations.of(context)!.sendFeedback,
                         onTap: () {
                           Navigator.pop(context);
-                          // TODO: Navigate to feedback screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const StubScreen(
+                                title: 'Feedback',
+                                icon: Icons.feedback_outlined,
+                              ),
+                            ),
+                          );
                         },
                       ),
                       _buildDrawerItem(
