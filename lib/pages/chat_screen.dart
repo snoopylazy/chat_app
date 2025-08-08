@@ -40,8 +40,6 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _replyToMessageId;
   String? _replyToMessageText;
   String? _replyToMessageSenderEmail;
-  // String? _editingMessageId;
-  // String? _editingMessageText;
 
   @override
   void initState() {
@@ -71,6 +69,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onTextChanged() {
+    // Don't process if widget is not mounted
+    if (!mounted) return;
+
     final chatRoomId =
         widget.chatRoomId ??
         _chatService.getChatRoomId(
@@ -78,12 +79,15 @@ class _ChatScreenState extends State<ChatScreen> {
           widget.receivedId,
         );
 
-    if (_messageController.text.isNotEmpty && !_isTyping) {
+    final hasText = _messageController.text.isNotEmpty;
+
+    // Only update typing status if it actually changed
+    if (hasText && !_isTyping) {
       setState(() {
         _isTyping = true;
       });
       _chatService.setTypingStatus(chatRoomId, true);
-    } else if (_messageController.text.isEmpty && _isTyping) {
+    } else if (!hasText && _isTyping) {
       setState(() {
         _isTyping = false;
       });
@@ -92,9 +96,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Reset typing timer
     _typingTimer?.cancel();
-    if (_messageController.text.isNotEmpty) {
+    if (hasText) {
       _typingTimer = Timer(const Duration(seconds: 2), () {
-        if (mounted) {
+        if (mounted && _isTyping) {
           setState(() {
             _isTyping = false;
           });
@@ -116,6 +120,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void sendMessage() async {
     if (_messageController.text.isNotEmpty) {
+      // Store the message text and clear input immediately
+      final messageText = _messageController.text;
+      _messageController.clear();
+
+      // Cancel typing timer and reset typing status immediately
+      _typingTimer?.cancel();
+      setState(() {
+        _isTyping = false;
+      });
+
       final chatRoomId =
           widget.chatRoomId ??
           _chatService.getChatRoomId(
@@ -123,30 +137,41 @@ class _ChatScreenState extends State<ChatScreen> {
             widget.receivedId,
           );
 
-      await _chatService.sendMessage(
-        widget.receivedId,
-        _messageController.text,
-        chatRoomId: chatRoomId,
-        metadata: _replyToMessageSenderEmail == null
-            ? null
-            : {'replyToSenderEmail': _replyToMessageSenderEmail},
-        replyToMessageId: _replyToMessageId,
-        replyToMessageText: _replyToMessageText,
-      );
-
-      _messageController.clear();
-      setState(() {
-        _replyToMessageId = null;
-        _replyToMessageText = null;
-        _replyToMessageSenderEmail = null;
-      });
-      // Close keyboard
-      _focusNode.unfocus();
+      // Set typing status to false immediately
       _chatService.setTypingStatus(chatRoomId, false);
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        scrollDown();
-      });
+      // Close keyboard
+      _focusNode.unfocus();
+
+      try {
+        await _chatService.sendMessage(
+          widget.receivedId,
+          messageText, // Use stored message text
+          chatRoomId: chatRoomId,
+          metadata: _replyToMessageSenderEmail == null
+              ? null
+              : {'replyToSenderEmail': _replyToMessageSenderEmail},
+          replyToMessageId: _replyToMessageId,
+          replyToMessageText: _replyToMessageText,
+        );
+
+        // Clear reply state only after successful send
+        setState(() {
+          _replyToMessageId = null;
+          _replyToMessageText = null;
+          _replyToMessageSenderEmail = null;
+        });
+
+        // Scroll down after message is sent
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          scrollDown();
+        });
+      } catch (error) {
+        // If sending fails, you might want to restore the message
+        // _messageController.text = messageText;
+        // Show error to user
+        print('Error sending message: $error');
+      }
     }
   }
 
@@ -424,40 +449,6 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.search),
             onPressed: () => _showSearchDialog(),
           ),
-          // PopupMenuButton<String>(
-          //   onSelected: (value) {
-          //     switch (value) {
-          //       case 'clear':
-          //         _clearChat();
-          //         break;
-          //       case 'block':
-          //         _blockUser();
-          //         break;
-          //     }
-          //   },
-          //   itemBuilder: (context) => [
-          //     PopupMenuItem(
-          //       value: 'clear',
-          //       child: Row(
-          //         children: [
-          //           Icon(Icons.clear_all),
-          //           SizedBox(width: 8),
-          //           Text(AppLocalizations.of(context)!.clearChat),
-          //         ],
-          //       ),
-          //     ),
-          //     PopupMenuItem(
-          //       value: 'block',
-          //       child: Row(
-          //         children: [
-          //           Icon(Icons.block),
-          //           SizedBox(width: 8),
-          //           Text(AppLocalizations.of(context)!.blockUser),
-          //         ],
-          //       ),
-          //     ),
-          //   ],
-          // ),
         ],
       ),
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -515,7 +506,8 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
 
-        final docs = snapshot.data!.docs.reversed.toList();
+        // FIXED: Remove the .reversed.toList() since we're already using reverse: true
+        final docs = snapshot.data!.docs;
 
         if (docs.isEmpty) {
           return Center(
@@ -554,16 +546,20 @@ class _ChatScreenState extends State<ChatScreen> {
         return AnimationLimiter(
           child: ListView.builder(
             controller: _scrollController,
-            reverse: true,
+            reverse: true, // This makes the ListView scroll from bottom
             padding: const EdgeInsets.all(10.0),
             itemCount: docs.length,
             itemBuilder: (context, index) {
+              // Since reverse: true, we need to access items in reverse order
+              final reversedIndex = docs.length - 1 - index;
               return AnimationConfiguration.staggeredList(
                 position: index,
                 duration: const Duration(milliseconds: 375),
                 child: SlideAnimation(
                   verticalOffset: 50.0,
-                  child: FadeInAnimation(child: _buildMessageItem(docs[index])),
+                  child: FadeInAnimation(
+                    child: _buildMessageItem(docs[reversedIndex]),
+                  ),
                 ),
               );
             },
@@ -706,7 +702,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               const SizedBox(width: 8),
               Text(
-                '${typingUsers.keys.first} is typing...}',
+                '${typingUsers.keys.first} is typing...',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(

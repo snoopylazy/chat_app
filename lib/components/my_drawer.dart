@@ -1,3 +1,6 @@
+import 'package:chat_app/components/support_screen.dart';
+import 'package:chat_app/pages/feedback_screen.dart';
+import 'package:chat_app/pages/profile_screen.dart';
 import 'package:chat_app/services/auth/auth_service.dart';
 import 'package:chat_app/pages/settings_screen.dart';
 import 'package:chat_app/pages/stub_screen.dart';
@@ -135,10 +138,7 @@ class MyDrawer extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const StubScreen(
-                                title: 'Profile',
-                                icon: Icons.person_outline,
-                              ),
+                              builder: (context) => const ProfileScreen(),
                             ),
                           );
                         },
@@ -202,10 +202,7 @@ class MyDrawer extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const StubScreen(
-                                title: 'Help & Support',
-                                icon: Icons.help_outline,
-                              ),
+                              builder: (context) => const HelpSupportScreen(),
                             ),
                           );
                         },
@@ -219,10 +216,7 @@ class MyDrawer extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const StubScreen(
-                                title: 'Feedback',
-                                icon: Icons.feedback_outlined,
-                              ),
+                              builder: (context) => FeedbackScreen(),
                             ),
                           );
                         },
