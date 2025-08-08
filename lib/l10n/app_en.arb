@@ -1,0 +1,179 @@
+{
+  "@@locale": "en",
+  "appTitle": "ChitChat",
+  "welcomeBack": "Welcome back, you've been missed!",
+  "createAccount": "Let's create an account for you!",
+  "email": "Email",
+  "password": "Password",
+  "confirmPassword": "Confirm Password",
+  "login": "Login",
+  "register": "Register",
+  "notAMember": "Not a member?",
+  "registerNow": "Register now",
+  "alreadyHaveAccount": "Already have an account?",
+  "loginNow": "Login now",
+  "settings": "Settings",
+  "darkMode": "Dark Mode",
+  "language": "Language",
+  "about": "About",
+  "version": "Version",
+  "logout": "Logout",
+  "logoutConfirm": "Are you sure you want to logout?",
+  "cancel": "Cancel",
+  "add": "Add",
+  "home": "Home",
+  "chats": "Chats",
+  "groups": "Groups",
+  "search": "Search",
+  "searchUsers": "Search users...",
+  "noUsersFound": "No users found.",
+  "noChatUsersYet": "No chat users yet.\nTap the + button to add someone!",
+  "noGroupChatsYet": "No group chats yet.\nTap the + button to create one!",
+  "noDataAvailable": "No data available",
+  "loading": "Loading...",
+  "somethingWentWrong": "Something went wrong",
+  "addUserToChat": "Add User to Chat",
+  "enterEmailAddress": "Enter the email address of the user you want to chat with:",
+  "createGroupChat": "Create Group Chat",
+  "groupName": "Group Name",
+  "enterGroupName": "Enter group name...",
+  "addParticipantEmail": "Add Participant Email",
+  "enterEmailAndPressEnter": "Enter email and press Enter",
+  "participants": "Participants",
+  "addAtLeast2Participants": "Add at least 2 participants to create a group chat",
+  "youCannotAddYourself": "You cannot add yourself to the group",
+  "userAlreadyAdded": "User already added to the group",
+  "groupChatMustHave3Participants": "Group chat must have at least 3 participants (including you)",
+  "userAddedSuccessfully": "User added successfully!",
+  "groupChatCreatedSuccessfully": "Group chat created successfully!",
+  "errorAddingUser": "Error adding user: {error}",
+  "@errorAddingUser": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "errorCreatingGroupChat": "Error creating group chat: {error}",
+  "@errorCreatingGroupChat": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "pleaseEnterEmail": "Please enter an email address",
+  "pleaseEnterPassword": "Please enter an email password",
+  "pleaseEnterGroupName": "Please enter a group name",
+  "passwordsDoNotMatch": "Passwords do not match",
+  "pleaseFillOutAllFields": "Please fill out all fields",
+  "registrationSuccessful": "Registration successful",
+  "loginSuccessful": "Login Successful",
+  "pleaseEnterBothEmailAndPassword": "Please enter both email and password.",
+  "passwordMustBeAtLeast6Characters": "Password MustBe AtLeast 6 Characters",
+  "pleaseEnterValidEmail": "Please Enter Valid Email!!",
+  "online": "Online",
+  "active": "Active",
+  "lastSeen": "Last seen",
+  "justNow": "Just now",
+  "minutesAgo": "{minutes}m ago",
+  "@minutesAgo": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "{hours}h ago",
+  "@hoursAgo": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "isTyping": "is typing...",
+  "@isTyping": {
+    "placeholders": {
+      "user": {
+        "type": "String"
+      }
+    }
+  },
+  "messageRemoved": "Message has been removed",
+  "messageRemovedBy": "Message removed by {user}",
+  "@messageRemovedBy": {
+    "placeholders": {
+      "user": {
+        "type": "String"
+      }
+    }
+  },
+  "edited": "edited",
+  "clearChat": "Clear Chat",
+  "blockUser": "Block User",
+  "edit": "Edit",
+  "delete": "Delete",
+  "reply": "Reply",
+  "noMessages": "No messages",
+  "useThePlusButtonToAddUsers": "Use the + button to add users to chat with",
+  "useThePlusButtonToCreateGroupChat": "Use the + button to create a group chat",
+  "english": "English",
+  "chinese": "中文",
+  "selectLanguage": "Select Language",
+  "profile": "Profile",
+  "notifications": "Notifications",
+  "privacy": "Privacy",
+  "help": "Help",
+  "feedback": "Feedback",
+  "termsOfService": "Terms of Service",
+  "privacyPolicy": "Privacy Policy",
+  "contactUs": "Contact Us",
+  "rateApp": "Rate App",
+  "shareApp": "Share App",
+  "reportBug": "Report Bug",
+  "suggestFeature": "Suggest Feature",
+  "create": "Create",
+  "searchMessages": "Search Messages",
+  "searchMessagesHint": "Search for messages...",
+  "deleteMessageTitle": "Delete Message",
+  "deleteMessageConfirm": "Are you sure you want to delete this message?",
+  "save": "Save",
+  "editMessageTitle": "Edit Message",
+  "typeAMessage": "Type a message...",
+  "noMessagesYet": "No messages yet",
+  "startTheConversation": "Start the conversation!",
+  "error": "Error",
+  "main": "Main",
+  "account": "Account",
+  "support": "Support",
+  "helpSupport": "Help & Support",
+  "sendFeedback": "Send Feedback",
+  "appName": "Chat App",
+  "appDescription": "A modern chat application built with Flutter and Firebase.",
+  "editProfile": "Edit Profile",
+  "changeAvatar": "Change Avatar",
+  "appearance": "Appearance",
+  "pushNotifications": "Push Notifications",
+  "sound": "Sound",
+  "vibration": "Vibration",
+  "onlineStatus": "Online Status",
+  "blockedUsers": "Blocked Users",
+  "helpCenter": "Help Center",
+  "appVersion": "App Version",
+  "selectLanguageTitle": "Select Language",
+  "signInToContinue": "Sign in to continue your conversations",
+  "signIn": "sign In",
+  "signUp": "sign Up",
+  "or": "Or",
+  "dontHaveAnAccount": "Don't have an account? ",
+  "bySigningInYouAgreeToOurTermsOfServiceAndPrivacyPolicy": "By signing in, you agree to our Terms of Service and Privacy Policy",
+  "registrationSuccessful": "Registration Successful",
+  "joinUsAndStartChattingWithFriends": "Join us and start chatting with friends",
+  "pleaseconfirmPassword": "Please confirm password",
+  "byCreatingAnAccountYouAgreeToOurTermsOfServiceAndPrivacyPolicy": "By creating an account, you agree to our Terms of Service and Privacy Policy",
+  "areYouSureYouWantToDeleteThisMessage": "Are you sure you want to delete this message?",
+  "image": "Image",
+  "file": "File",
+  "errorLoggingOut": "Error logging out: {error}"
+}

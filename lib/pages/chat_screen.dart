@@ -1,18 +1,26 @@
 import 'package:chat_app/components/chat_buddle.dart';
 import 'package:chat_app/services/auth/auth_service.dart';
 import 'package:chat_app/services/chats/chat_service.dart';
+import 'package:chat_app/modals/message.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'dart:async';
+import 'package:chat_app/gen_l10n/app_localizations.dart';
 
 class ChatScreen extends StatefulWidget {
   final String receivedEmail;
   final String receivedId;
+  final String? chatRoomId;
+  final bool isGroupChat;
 
   const ChatScreen({
     super.key,
     required this.receivedEmail,
     required this.receivedId,
+    this.chatRoomId,
+    this.isGroupChat = false,
   });
 
   @override
@@ -26,24 +34,28 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
 
-  // Track deleted message IDs locally for instant UI update
   Set<String> _deletedMessages = {};
+  bool _isTyping = false;
+  Timer? _typingTimer;
+  String? _editingMessageId;
+  String? _editingMessageText;
 
   @override
   void initState() {
     super.initState();
 
-    // Mark chat as read when opening
     final currentUserId = FirebaseAuth.instance.currentUser!.uid;
     _chatService.markChatAsReadOnOpen(currentUserId, widget.receivedId);
 
     _focusNode.addListener(() {
       if (_focusNode.hasFocus) {
         Future.delayed(const Duration(milliseconds: 300), scrollDown);
-        // Mark as read when user focuses on input (actively engaging)
         _chatService.markChatAsReadOnOpen(currentUserId, widget.receivedId);
       }
     });
+
+    // Start typing indicator when user starts typing
+    _messageController.addListener(_onTextChanged);
   }
 
   @override
@@ -51,7 +63,42 @@ class _ChatScreenState extends State<ChatScreen> {
     _focusNode.dispose();
     _messageController.dispose();
     _scrollController.dispose();
+    _typingTimer?.cancel();
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    final chatRoomId =
+        widget.chatRoomId ??
+        _chatService.getChatRoomId(
+          _authService.getCurrentUser()!.uid,
+          widget.receivedId,
+        );
+
+    if (_messageController.text.isNotEmpty && !_isTyping) {
+      setState(() {
+        _isTyping = true;
+      });
+      _chatService.setTypingStatus(chatRoomId, true);
+    } else if (_messageController.text.isEmpty && _isTyping) {
+      setState(() {
+        _isTyping = false;
+      });
+      _chatService.setTypingStatus(chatRoomId, false);
+    }
+
+    // Reset typing timer
+    _typingTimer?.cancel();
+    if (_messageController.text.isNotEmpty) {
+      _typingTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _isTyping = false;
+          });
+          _chatService.setTypingStatus(chatRoomId, false);
+        }
+      });
+    }
   }
 
   void scrollDown() {
@@ -66,8 +113,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void sendMessage() async {
     if (_messageController.text.isNotEmpty) {
-      await _chatService.sendMessage(widget.receivedId, _messageController.text);
+      final chatRoomId =
+          widget.chatRoomId ??
+          _chatService.getChatRoomId(
+            _authService.getCurrentUser()!.uid,
+            widget.receivedId,
+          );
+
+      await _chatService.sendMessage(
+        widget.receivedId,
+        _messageController.text,
+        chatRoomId: chatRoomId,
+      );
+
       _messageController.clear();
+      _chatService.setTypingStatus(chatRoomId, false);
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         scrollDown();
@@ -80,11 +140,19 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Confirm Delete"),
-          content: const Text("Are you sure you want to delete this message?"),
+          title: Text(AppLocalizations.of(context)!.deleteMessageTitle),
+          content: Text(
+            AppLocalizations.of(context)!.areYouSureYouWantToDeleteThisMessage,
+          ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text("Cancel")),
-            TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text("Delete")),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(AppLocalizations.of(context)!.delete),
+            ),
           ],
         );
       },
@@ -92,9 +160,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (confirmed == true) {
       final currentUserId = _authService.getCurrentUser()!.uid;
-      List<String> ids = [currentUserId, widget.receivedId];
-      ids.sort();
-      String chatRoomId = ids.join('_');
+      final chatRoomId =
+          widget.chatRoomId ??
+          _chatService.getChatRoomId(currentUserId, widget.receivedId);
 
       await _chatService.deleteMessage(chatRoomId, doc.id);
       setState(() {
@@ -103,7 +171,56 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Widget _buildUserAvatar(String userName, bool isOnline, bool isRecentlyActive) {
+  Future<void> _editMessage(DocumentSnapshot doc, String currentMessage) async {
+    final TextEditingController editController = TextEditingController(
+      text: currentMessage,
+    );
+
+    final String? newMessage = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(AppLocalizations.of(context)!.editMessageTitle),
+          content: TextField(
+            controller: editController,
+            decoration: InputDecoration(
+              hintText: AppLocalizations.of(context)!.edit,
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(editController.text),
+              child: Text(AppLocalizations.of(context)!.save),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newMessage != null &&
+        newMessage.isNotEmpty &&
+        newMessage != currentMessage) {
+      final currentUserId = _authService.getCurrentUser()!.uid;
+      final chatRoomId =
+          widget.chatRoomId ??
+          _chatService.getChatRoomId(currentUserId, widget.receivedId);
+
+      await _chatService.editMessage(chatRoomId, doc.id, newMessage);
+    }
+  }
+
+  Widget _buildUserAvatar(
+    String userName,
+    bool isOnline,
+    bool isRecentlyActive,
+  ) {
     return Stack(
       alignment: Alignment.bottomRight,
       children: [
@@ -119,7 +236,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ),
-        // Online status indicator
         Container(
           width: 12,
           height: 12,
@@ -134,7 +250,10 @@ class _ChatScreenState extends State<ChatScreen> {
             boxShadow: [
               if (isOnline)
                 BoxShadow(
-                  color: _getStatusColor(isOnline, isRecentlyActive).withOpacity(0.6),
+                  color: _getStatusColor(
+                    isOnline,
+                    isRecentlyActive,
+                  ).withOpacity(0.6),
                   blurRadius: 3,
                   spreadRadius: 1,
                 ),
@@ -142,14 +261,14 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           child: isOnline
               ? Container(
-            width: 4,
-            height: 4,
-            margin: const EdgeInsets.all(2),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-          )
+                  width: 4,
+                  height: 4,
+                  margin: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                )
               : null,
         ),
       ],
@@ -207,9 +326,12 @@ class _ChatScreenState extends State<ChatScreen> {
               );
             }
 
-            final userData = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+            final userData =
+                snapshot.data!.data() as Map<String, dynamic>? ?? {};
             final bool isOnline = userData['isOnline'] ?? false;
-            final bool isRecentlyActive = _authService.isRecentlyActive(userData);
+            final bool isRecentlyActive = _authService.isRecentlyActive(
+              userData,
+            );
             final String lastSeenText = _authService.getLastSeenText(userData);
 
             return Row(
@@ -223,7 +345,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Text(
                         userName,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
@@ -232,22 +357,34 @@ class _ChatScreenState extends State<ChatScreen> {
                           fontSize: 12,
                           color: isOnline
                               ? Colors.green[600]
-                              : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                          fontWeight: isOnline ? FontWeight.w500 : FontWeight.normal,
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withOpacity(0.7),
+                          fontWeight: isOnline
+                              ? FontWeight.w500
+                              : FontWeight.normal,
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Optional status badge
                 if (isOnline || isRecentlyActive)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(isOnline, isRecentlyActive).withOpacity(0.15),
+                      color: _getStatusColor(
+                        isOnline,
+                        isRecentlyActive,
+                      ).withOpacity(0.15),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: _getStatusColor(isOnline, isRecentlyActive).withOpacity(0.3),
+                        color: _getStatusColor(
+                          isOnline,
+                          isRecentlyActive,
+                        ).withOpacity(0.3),
                         width: 1,
                       ),
                     ),
@@ -267,16 +404,56 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
         elevation: Theme.of(context).appBarTheme.elevation,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => _showSearchDialog(),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'clear':
+                  _clearChat();
+                  break;
+                case 'block':
+                  _blockUser();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'clear',
+                child: Row(
+                  children: [
+                    Icon(Icons.clear_all),
+                    SizedBox(width: 8),
+                    Text(AppLocalizations.of(context)!.clearChat),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'block',
+                child: Row(
+                  children: [
+                    Icon(Icons.block),
+                    SizedBox(width: 8),
+                    Text(AppLocalizations.of(context)!.blockUser),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Column(
         children: [
-          // Optional: Add a subtle divider
           Container(
             height: 1,
             color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
           ),
           Expanded(child: _buildMessageList()),
+          _buildTypingIndicator(),
           _buildUserInput(),
         ],
       ),
@@ -286,7 +463,11 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessageList() {
     String senderId = _authService.getCurrentUser()!.uid;
     return StreamBuilder<QuerySnapshot>(
-      stream: _chatService.getMessages(senderId, widget.receivedId),
+      stream: _chatService.getMessages(
+        senderId,
+        widget.receivedId,
+        chatRoomId: widget.chatRoomId,
+      ),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
@@ -300,7 +481,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  "Error: ${snapshot.error}",
+                  "${AppLocalizations.of(context)!.error}: ${snapshot.error}",
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
@@ -310,7 +491,8 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
 
-        if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            !snapshot.hasData) {
           return Center(
             child: CircularProgressIndicator(
               color: Theme.of(context).colorScheme.primary,
@@ -332,16 +514,20 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  "No messages yet",
+                  AppLocalizations.of(context)!.noMessagesYet,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.7),
                     fontSize: 16,
                   ),
                 ),
                 Text(
-                  "Start the conversation!",
+                  AppLocalizations.of(context)!.startTheConversation,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.5),
                     fontSize: 14,
                   ),
                 ),
@@ -350,14 +536,23 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
 
-        return ListView.builder(
-          controller: _scrollController,
-          reverse: true,
-          padding: const EdgeInsets.all(10.0),
-          itemCount: docs.length,
-          itemBuilder: (context, index) {
-            return _buildMessageItem(docs[index]);
-          },
+        return AnimationLimiter(
+          child: ListView.builder(
+            controller: _scrollController,
+            reverse: true,
+            padding: const EdgeInsets.all(10.0),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              return AnimationConfiguration.staggeredList(
+                position: index,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(child: _buildMessageItem(docs[index])),
+                ),
+              );
+            },
+          ),
         );
       },
     );
@@ -366,34 +561,133 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildMessageItem(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     bool isCurrentUser = data['senderID'] == _authService.getCurrentUser()!.uid;
-    final bool isDeleted = (data['deleted'] ?? false) == true || _deletedMessages.contains(doc.id);
+    final bool isDeleted =
+        (data['deleted'] ?? false) == true || _deletedMessages.contains(doc.id);
+    final MessageStatus status = MessageStatus.values.firstWhere(
+      (e) => e.name == (data['status'] ?? 'sent'),
+      orElse: () => MessageStatus.sent,
+    );
+    final bool isEdited = data['isEdited'] ?? false;
+    final Timestamp? timestamp = data['timestamp'];
+    final String? replyToMessageText = data['replyToMessageText'];
 
-    // Use deletedByEmail to show friendly identifier
     String? removedBy = data['deletedByEmail'];
     if (removedBy == null || removedBy.isEmpty) {
       removedBy = 'Unknown';
     }
 
     return GestureDetector(
-      onLongPress: () async {
-        await Future.delayed(const Duration(seconds: 3));
-        if (!isDeleted) {
-          _deleteMessageConfirm(doc);
-        }
-      },
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        child: ChatBuddle(
-          key: ValueKey(doc.id),
-          message: data['message'],
-          isCurrentUser: isCurrentUser,
-          isDeleted: isDeleted,
-          removedBy: removedBy,
-        ),
+      onLongPress: () => _showMessageOptions(doc, data, isCurrentUser),
+      child: ChatBuddle(
+        key: ValueKey(doc.id),
+        message: data['message'],
+        isCurrentUser: isCurrentUser,
+        isDeleted: isDeleted,
+        removedBy: removedBy,
+        timestamp: timestamp,
+        status: status,
+        isEdited: isEdited,
+        replyToMessage: replyToMessageText,
       ),
+    );
+  }
+
+  void _showMessageOptions(
+    DocumentSnapshot doc,
+    Map<String, dynamic> data,
+    bool isCurrentUser,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isCurrentUser && !data['deleted']) ...[
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: Text(AppLocalizations.of(context)!.edit),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editMessage(doc, data['message']);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete),
+                  title: Text(AppLocalizations.of(context)!.delete),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _deleteMessageConfirm(doc);
+                  },
+                ),
+              ],
+              ListTile(
+                leading: const Icon(Icons.reply),
+                title: Text(AppLocalizations.of(context)!.reply),
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: Implement reply functionality
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    final chatRoomId =
+        widget.chatRoomId ??
+        _chatService.getChatRoomId(
+          _authService.getCurrentUser()!.uid,
+          widget.receivedId,
+        );
+
+    return StreamBuilder<Map<String, bool>>(
+      stream: _chatService.getTypingStatusStream(chatRoomId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final typingUsers = snapshot.data!;
+        final currentUserEmail = _authService.getCurrentUser()!.email!;
+        typingUsers.remove(currentUserEmail);
+
+        if (typingUsers.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${typingUsers.keys.first} ${AppLocalizations.of(context)!.isTyping}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -413,6 +707,10 @@ class _ChatScreenState extends State<ChatScreen> {
       child: SafeArea(
         child: Row(
           children: [
+            IconButton(
+              icon: const Icon(Icons.attach_file),
+              onPressed: () => _showAttachmentOptions(),
+            ),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -426,9 +724,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
                   decoration: InputDecoration(
-                    hintText: "Type a message...",
+                    hintText: AppLocalizations.of(context)!.typeAMessage,
                     hintStyle: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.6),
                     ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
@@ -459,5 +759,85 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: Text(AppLocalizations.of(context)!.image),
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: Implement image picker
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.file_present),
+                title: Text(AppLocalizations.of(context)!.file),
+                onTap: () {
+                  Navigator.pop(context);
+                  // TODO: Implement file picker
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSearchDialog() {
+    final TextEditingController searchController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(AppLocalizations.of(context)!.searchMessages),
+          content: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: AppLocalizations.of(context)!.searchMessagesHint,
+              border: const OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                if (searchController.text.isNotEmpty) {
+                  _searchMessages(searchController.text);
+                }
+              },
+              child: Text(AppLocalizations.of(context)!.search),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _searchMessages(String query) {
+    // TODO: Implement message search functionality
+  }
+
+  void _clearChat() {
+    // TODO: Implement clear chat functionality
+  }
+
+  void _blockUser() {
+    // TODO: Implement block user functionality
   }
 }
