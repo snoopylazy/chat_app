@@ -609,7 +609,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'Made with ❤️ by Your Development Team',
+              'Made with ❤️ by Snoopy',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
               ),

@@ -435,4 +435,91 @@ class AppLocalizationsEn extends AppLocalizations {
   String errorLoggingOut(Object error) {
     return 'Error logging out: $error';
   }
+
+  @override
+  String get newMessages => 'New Messages';
+
+  @override
+  String get stayUpdated => 'Stay Updated';
+
+  @override
+  String get directMessages => 'Direct Message';
+
+  @override
+  String get groupMessages => 'Group Message';
+
+  @override
+  String get updateYourProfileDetails => 'Update Your Profile Details';
+
+  @override
+  String get updateYourAvatar => 'Update Your Avatar';
+
+  @override
+  String get toggleDarkLightMode => 'Toggle Dark/Light Mode';
+
+  @override
+  String get receivePushNotifications => 'Receive Push Notifications';
+
+  @override
+  String get enableNotificationSound => 'Enable Notification Sound';
+
+  @override
+  String get enableNotificationVibration => 'Enable Notification Vibration';
+
+  @override
+  String get showOnlineStatus => 'Show Online Status';
+
+  @override
+  String get manageBlockedUsers => 'Manage Blocked Users';
+
+  @override
+  String get getHelpAndSupport => 'Get Help And Support';
+
+  @override
+  String get shareYourFeedback => 'Share Your Feedback';
+
+  @override
+  String get reportIssues => 'Report Issues';
+
+  @override
+  String get viewTermsOfService => 'View Terms Of Service';
+
+  @override
+  String get viewPrivacyPolicy => 'View Privacy Policy';
+
+  @override
+  String get describeTheIssue => 'Describe The Issue';
+
+  @override
+  String get bugReported => 'Bug Reported';
+
+  @override
+  String get submit => 'Submit';
+
+  @override
+  String get noBlockedUsers => 'No Blocked Users';
+
+  @override
+  String get userUnblocked => 'User Unblocked';
+
+  @override
+  String get errorUnblockingUser => 'Error Unblocking User';
+
+  @override
+  String get select => 'Select';
+
+  @override
+  String get avatarUpdated => 'Avatar Updated';
+
+  @override
+  String get avatarUploadNotImplemented => 'Avatar Upload Not Implemented';
+
+  @override
+  String get bugReportInfo => 'Bug Report Info';
+
+  @override
+  String get errorSendingBugReport => 'Error Sending Bug Report';
+
+  @override
+  String get bugReportEmpty => 'Bug Report Empty';
 }

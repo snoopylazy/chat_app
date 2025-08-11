@@ -422,4 +422,91 @@ class AppLocalizationsZh extends AppLocalizations {
   String errorLoggingOut(Object error) {
     return '錯誤記錄輸出: $error';
   }
+
+  @override
+  String get newMessages => '新消息';
+
+  @override
+  String get stayUpdated => '保持更新';
+
+  @override
+  String get directMessages => '私訊';
+
+  @override
+  String get groupMessages => '群組留言';
+
+  @override
+  String get updateYourProfileDetails => '更新您的個人資料詳情';
+
+  @override
+  String get updateYourAvatar => '更新你的頭像';
+
+  @override
+  String get toggleDarkLightMode => '切換暗光模式';
+
+  @override
+  String get receivePushNotifications => '接收推播通知';
+
+  @override
+  String get enableNotificationSound => '啟用通知聲音';
+
+  @override
+  String get enableNotificationVibration => '啟用通知振動';
+
+  @override
+  String get showOnlineStatus => '顯示線上狀態';
+
+  @override
+  String get manageBlockedUsers => '管理已封鎖用戶';
+
+  @override
+  String get getHelpAndSupport => '獲取協助和支持';
+
+  @override
+  String get shareYourFeedback => '分享您的回饋';
+
+  @override
+  String get reportIssues => '報告問題';
+
+  @override
+  String get viewTermsOfService => '查看服務條款';
+
+  @override
+  String get viewPrivacyPolicy => '查看隱私權政策';
+
+  @override
+  String get describeTheIssue => '描述問題';
+
+  @override
+  String get bugReported => '已報告錯誤';
+
+  @override
+  String get submit => '提交';
+
+  @override
+  String get noBlockedUsers => '無封鎖用戶';
+
+  @override
+  String get userUnblocked => '用戶解鎖';
+
+  @override
+  String get errorUnblockingUser => '錯誤解除封鎖用戶';
+
+  @override
+  String get select => '選擇';
+
+  @override
+  String get avatarUpdated => '頭像已更新';
+
+  @override
+  String get avatarUploadNotImplemented => '頭像上傳未實現';
+
+  @override
+  String get bugReportInfo => '錯誤報告訊息';
+
+  @override
+  String get errorSendingBugReport => '錯誤發送錯誤報告';
+
+  @override
+  String get bugReportEmpty => '錯誤報告空';
 }

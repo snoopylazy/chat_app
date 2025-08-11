@@ -895,6 +895,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Error logging out: {error}'**
   String errorLoggingOut(Object error);
+
+  /// No description provided for @newMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'New Messages'**
+  String get newMessages;
+
+  /// No description provided for @stayUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay Updated'**
+  String get stayUpdated;
+
+  /// No description provided for @directMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Message'**
+  String get directMessages;
+
+  /// No description provided for @groupMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Group Message'**
+  String get groupMessages;
+
+  /// No description provided for @updateYourProfileDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Your Profile Details'**
+  String get updateYourProfileDetails;
+
+  /// No description provided for @updateYourAvatar.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Your Avatar'**
+  String get updateYourAvatar;
+
+  /// No description provided for @toggleDarkLightMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Dark/Light Mode'**
+  String get toggleDarkLightMode;
+
+  /// No description provided for @receivePushNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive Push Notifications'**
+  String get receivePushNotifications;
+
+  /// No description provided for @enableNotificationSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Notification Sound'**
+  String get enableNotificationSound;
+
+  /// No description provided for @enableNotificationVibration.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Notification Vibration'**
+  String get enableNotificationVibration;
+
+  /// No description provided for @showOnlineStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Online Status'**
+  String get showOnlineStatus;
+
+  /// No description provided for @manageBlockedUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Blocked Users'**
+  String get manageBlockedUsers;
+
+  /// No description provided for @getHelpAndSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Help And Support'**
+  String get getHelpAndSupport;
+
+  /// No description provided for @shareYourFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Your Feedback'**
+  String get shareYourFeedback;
+
+  /// No description provided for @reportIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Report Issues'**
+  String get reportIssues;
+
+  /// No description provided for @viewTermsOfService.
+  ///
+  /// In en, this message translates to:
+  /// **'View Terms Of Service'**
+  String get viewTermsOfService;
+
+  /// No description provided for @viewPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'View Privacy Policy'**
+  String get viewPrivacyPolicy;
+
+  /// No description provided for @describeTheIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe The Issue'**
+  String get describeTheIssue;
+
+  /// No description provided for @bugReported.
+  ///
+  /// In en, this message translates to:
+  /// **'Bug Reported'**
+  String get bugReported;
+
+  /// No description provided for @submit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get submit;
+
+  /// No description provided for @noBlockedUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'No Blocked Users'**
+  String get noBlockedUsers;
+
+  /// No description provided for @userUnblocked.
+  ///
+  /// In en, this message translates to:
+  /// **'User Unblocked'**
+  String get userUnblocked;
+
+  /// No description provided for @errorUnblockingUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Error Unblocking User'**
+  String get errorUnblockingUser;
+
+  /// No description provided for @select.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get select;
+
+  /// No description provided for @avatarUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar Updated'**
+  String get avatarUpdated;
+
+  /// No description provided for @avatarUploadNotImplemented.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar Upload Not Implemented'**
+  String get avatarUploadNotImplemented;
+
+  /// No description provided for @bugReportInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Bug Report Info'**
+  String get bugReportInfo;
+
+  /// No description provided for @errorSendingBugReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Error Sending Bug Report'**
+  String get errorSendingBugReport;
+
+  /// No description provided for @bugReportEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Bug Report Empty'**
+  String get bugReportEmpty;
 }
 
 class _AppLocalizationsDelegate

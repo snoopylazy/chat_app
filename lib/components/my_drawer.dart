@@ -1,10 +1,13 @@
-import 'package:chat_app/components/support_screen.dart';
+import 'package:chat_app/pages/support_screen.dart';
+import 'package:chat_app/modals/chat_room.dart';
 import 'package:chat_app/pages/feedback_screen.dart';
+import 'package:chat_app/pages/notification_screen.dart';
 import 'package:chat_app/pages/profile_screen.dart';
 import 'package:chat_app/services/auth/auth_service.dart';
 import 'package:chat_app/pages/settings_screen.dart';
 import 'package:chat_app/pages/stub_screen.dart';
 import 'package:chat_app/providers/language_provider.dart';
+import 'package:chat_app/services/chats/chat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -157,7 +160,7 @@ class MyDrawer extends StatelessWidget {
                           );
                         },
                       ),
-                      _buildDrawerItem(
+                      _buildDrawerItemWithNotificationBadge(
                         context,
                         icon: Icons.notifications_outlined,
                         title: AppLocalizations.of(context)!.notifications,
@@ -166,10 +169,7 @@ class MyDrawer extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const StubScreen(
-                                title: 'Notifications',
-                                icon: Icons.notifications_outlined,
-                              ),
+                              builder: (context) => const NotificationScreen(),
                             ),
                           );
                         },
@@ -502,5 +502,134 @@ class MyDrawer extends StatelessWidget {
         );
       },
     );
+  }
+
+  Widget _buildDrawerItemWithNotificationBadge(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final chatService = ChatService();
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: chatService.getChatUsersStream(),
+      builder: (context, userSnapshot) {
+        return StreamBuilder<List<ChatRoom>>(
+          stream: chatService.getGroupChatRoomsStream(),
+          builder: (context, groupSnapshot) {
+            int totalUnreadCount = 0;
+
+            // Calculate unread count for direct chats
+            if (userSnapshot.hasData) {
+              final users = userSnapshot.data ?? [];
+              for (final user in users) {
+                final userId = user['uid'] ?? '';
+                final unreadStream = chatService.getUnreadMessageCount(
+                  currentUserId,
+                  userId,
+                );
+                totalUnreadCount += _getUnreadCountFromStream(unreadStream);
+              }
+            }
+
+            // Calculate unread count for group chats
+            if (groupSnapshot.hasData) {
+              final groups = groupSnapshot.data ?? [];
+              for (final group in groups) {
+                final groupId = group.id;
+                final unreadStream = chatService.getUnreadMessageCount(
+                  currentUserId,
+                  groupId,
+                );
+                totalUnreadCount += _getUnreadCountFromStream(unreadStream);
+              }
+            }
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              child: Stack(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      title,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onTap: onTap,
+                    hoverColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.1),
+                  ),
+                  if (totalUnreadCount > 0)
+                    Positioned(
+                      right: 16,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(1, 1),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          totalUnreadCount > 99
+                              ? '99+'
+                              : totalUnreadCount.toString(),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  int _getUnreadCountFromStream(Stream<int> unreadStream) {
+    int count = 0;
+    unreadStream.listen(
+      (unreadCount) {
+        count = unreadCount;
+      },
+      onError: (e) {
+        print('Error fetching unread count: $e');
+      },
+    );
+    return count;
   }
 }

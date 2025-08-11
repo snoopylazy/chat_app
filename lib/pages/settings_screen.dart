@@ -1,9 +1,18 @@
+import 'package:chat_app/pages/feedback_screen.dart';
+import 'package:chat_app/pages/profile_screen.dart';
+import 'package:chat_app/pages/stub_screen.dart';
+import 'package:chat_app/pages/support_screen.dart';
+import 'package:chat_app/services/auth/auth_service.dart';
 import 'package:chat_app/themes/theme_provider.dart';
 import 'package:chat_app/providers/language_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:chat_app/gen_l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,6 +22,45 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  bool _pushNotifications = true;
+  bool _sound = true;
+  bool _vibration = true;
+  bool _isOnline = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationSettings();
+    _loadOnlineStatus();
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _pushNotifications = prefs.getBool('push_notifications') ?? true;
+      _sound = prefs.getBool('sound') ?? true;
+      _vibration = prefs.getBool('vibration') ?? true;
+    });
+  }
+
+  Future<void> _saveNotificationSettings(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
+
+  Future<void> _loadOnlineStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('Users')
+          .doc(user.uid)
+          .get();
+      setState(() {
+        _isOnline = doc.data()?['isOnline'] ?? true;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -28,31 +76,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Profile Section
             _buildProfileSection(context),
             const SizedBox(height: 24),
-
-            // Appearance Section
             _buildAppearanceSection(context),
             const SizedBox(height: 24),
-
-            // Language Section
             _buildLanguageSection(context),
             const SizedBox(height: 24),
-
-            // Notifications Section
             _buildNotificationsSection(context),
             const SizedBox(height: 24),
-
-            // Privacy Section
             _buildPrivacySection(context),
             const SizedBox(height: 24),
-
-            // Support Section
             _buildSupportSection(context),
             const SizedBox(height: 24),
-
-            // About Section
             _buildAboutSection(context),
           ],
         ),
@@ -70,18 +105,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           icon: Icons.edit,
           title: AppLocalizations.of(context)!.editProfile,
-          subtitle: AppLocalizations.of(context)!.help,
+          subtitle: AppLocalizations.of(context)!.updateYourProfileDetails,
           onTap: () {
-            // TODO: Implement edit profile
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ProfileScreen()),
+            );
           },
         ),
         _buildSettingTile(
           context,
           icon: Icons.photo_camera,
           title: AppLocalizations.of(context)!.changeAvatar,
-          subtitle: AppLocalizations.of(context)!.help,
+          subtitle: AppLocalizations.of(context)!.updateYourAvatar,
           onTap: () {
-            // TODO: Implement change avatar
+            _showAvatarDialog(context);
           },
         ),
       ],
@@ -98,7 +136,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           icon: Icons.dark_mode,
           title: AppLocalizations.of(context)!.darkMode,
-          subtitle: AppLocalizations.of(context)!.appearance,
+          subtitle: AppLocalizations.of(context)!.toggleDarkLightMode,
           value: Provider.of<ThemeProvider>(context).isDarkMode,
           onChanged: (value) {
             Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
@@ -141,30 +179,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           icon: Icons.notifications_active,
           title: AppLocalizations.of(context)!.pushNotifications,
-          subtitle: AppLocalizations.of(context)!.notifications,
-          value: true,
+          subtitle: AppLocalizations.of(context)!.receivePushNotifications,
+          value: _pushNotifications,
           onChanged: (value) {
-            // TODO: Implement push notifications toggle
+            setState(() {
+              _pushNotifications = value;
+            });
+            _saveNotificationSettings('push_notifications', value);
           },
         ),
         _buildSwitchTile(
           context,
           icon: Icons.volume_up,
           title: AppLocalizations.of(context)!.sound,
-          subtitle: AppLocalizations.of(context)!.notifications,
-          value: true,
+          subtitle: AppLocalizations.of(context)!.enableNotificationSound,
+          value: _sound,
           onChanged: (value) {
-            // TODO: Implement sound toggle
+            setState(() {
+              _sound = value;
+            });
+            _saveNotificationSettings('sound', value);
           },
         ),
         _buildSwitchTile(
           context,
           icon: Icons.vibration,
           title: AppLocalizations.of(context)!.vibration,
-          subtitle: AppLocalizations.of(context)!.notifications,
-          value: true,
+          subtitle: AppLocalizations.of(context)!.enableNotificationVibration,
+          value: _vibration,
           onChanged: (value) {
-            // TODO: Implement vibration toggle
+            setState(() {
+              _vibration = value;
+            });
+            _saveNotificationSettings('vibration', value);
           },
         ),
       ],
@@ -177,22 +224,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       title: AppLocalizations.of(context)!.privacy,
       icon: Icons.security,
       children: [
-        _buildSettingTile(
+        _buildSwitchTile(
           context,
           icon: Icons.visibility,
           title: AppLocalizations.of(context)!.onlineStatus,
-          subtitle: AppLocalizations.of(context)!.privacy,
-          onTap: () {
-            // TODO: Implement online status toggle
+          subtitle: AppLocalizations.of(context)!.showOnlineStatus,
+          value: _isOnline,
+          onChanged: (value) {
+            setState(() {
+              _isOnline = value;
+            });
+            AuthService().setUserOnlineStatus(value);
           },
         ),
         _buildSettingTile(
           context,
           icon: Icons.block,
           title: AppLocalizations.of(context)!.blockedUsers,
-          subtitle: AppLocalizations.of(context)!.privacy,
+          subtitle: AppLocalizations.of(context)!.manageBlockedUsers,
           onTap: () {
-            // TODO: Implement blocked users
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const BlockedUsersScreen(),
+              ),
+            );
           },
         ),
       ],
@@ -209,27 +265,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           icon: Icons.help,
           title: AppLocalizations.of(context)!.helpCenter,
-          subtitle: AppLocalizations.of(context)!.help,
+          subtitle: AppLocalizations.of(context)!.getHelpAndSupport,
           onTap: () {
-            // TODO: Implement help center
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const HelpSupportScreen(),
+              ),
+            );
           },
         ),
         _buildSettingTile(
           context,
           icon: Icons.feedback,
           title: AppLocalizations.of(context)!.sendFeedback,
-          subtitle: AppLocalizations.of(context)!.feedback,
+          subtitle: AppLocalizations.of(context)!.shareYourFeedback,
           onTap: () {
-            // TODO: Implement feedback
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const FeedbackScreen()),
+            );
           },
         ),
         _buildSettingTile(
           context,
           icon: Icons.bug_report,
           title: AppLocalizations.of(context)!.reportBug,
-          subtitle: AppLocalizations.of(context)!.help,
+          subtitle: AppLocalizations.of(context)!.reportIssues,
           onTap: () {
-            // TODO: Implement bug report
+            _showBugReportDialog(context);
           },
         ),
       ],
@@ -250,18 +314,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () {
             showAboutDialog(
               context: context,
-              applicationName: "Chat App",
+              applicationName: AppLocalizations.of(context)!.appName,
               applicationVersion: "1.0.0",
               applicationIcon: Icon(
                 Icons.chat_bubble_outline,
                 color: Theme.of(context).colorScheme.primary,
                 size: 48,
               ),
-              children: [
-                const Text(
-                  "A modern chat application built with Flutter and Firebase.",
-                ),
-              ],
+              children: [Text(AppLocalizations.of(context)!.appDescription)],
             );
           },
         ),
@@ -269,18 +329,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
           context,
           icon: Icons.description,
           title: AppLocalizations.of(context)!.termsOfService,
-          subtitle: AppLocalizations.of(context)!.termsOfService,
+          subtitle: AppLocalizations.of(context)!.viewTermsOfService,
           onTap: () {
-            // TODO: Implement terms of service
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const StubScreen(
+                  title: 'Terms of Service',
+                  icon: Icons.supervised_user_circle_outlined,
+                ),
+              ),
+            );
           },
         ),
         _buildSettingTile(
           context,
           icon: Icons.privacy_tip,
           title: AppLocalizations.of(context)!.privacyPolicy,
-          subtitle: AppLocalizations.of(context)!.privacyPolicy,
+          subtitle: AppLocalizations.of(context)!.viewPrivacyPolicy,
           onTap: () {
-            // TODO: Implement privacy policy
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const StubScreen(
+                  title: 'Privacy Policy',
+                  icon: Icons.policy,
+                ),
+              ),
+            );
           },
         ),
       ],
@@ -431,7 +507,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Select Language"),
+          title: Text(AppLocalizations.of(context)!.selectLanguageTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: supportedLanguages.map((language) {
@@ -458,11 +534,286 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Cancel"),
+              child: Text(AppLocalizations.of(context)!.cancel),
             ),
           ],
         );
       },
     );
+  }
+
+  void _showAvatarDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(AppLocalizations.of(context)!.changeAvatar),
+          content: Text(
+            AppLocalizations.of(context)!.avatarUploadNotImplemented,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(AppLocalizations.of(context)!.avatarUpdated),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                );
+                Navigator.of(context).pop();
+              },
+              child: Text(AppLocalizations.of(context)!.select),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showBugReportDialog(BuildContext context) {
+    final TextEditingController bugController = TextEditingController();
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final userEmail = currentUser?.email ?? 'Unknown';
+    final userId = currentUser?.uid ?? 'Unknown';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(AppLocalizations.of(context)!.reportBug),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                AppLocalizations.of(context)!.bugReportInfo,
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.7),
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: bugController,
+                decoration: InputDecoration(
+                  hintText: AppLocalizations.of(context)!.describeTheIssue,
+                  border: const OutlineInputBorder(),
+                ),
+                maxLines: 4,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (bugController.text.isNotEmpty) {
+                  final subject = Uri.encodeComponent(
+                    'Bug Report from Chat App',
+                  );
+                  final body = Uri.encodeComponent('''
+                  Bug Description: ${bugController.text}
+
+                  Reported by:
+                  - Email: $userEmail
+                  - User ID: $userId
+                  - App Version: 1.0.0
+                  - Timestamp: ${DateTime.now().toIso8601String()}
+                  ''');
+                  final uri = Uri.parse(
+                    'mailto:tfortes14@gmail.com?subject=$subject&body=$body',
+                  );
+
+                  try {
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            AppLocalizations.of(context)!.bugReported,
+                          ),
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            AppLocalizations.of(context)!.errorSendingBugReport,
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          AppLocalizations.of(context)!.errorSendingBugReport,
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                  Navigator.of(context).pop();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        AppLocalizations.of(context)!.bugReportEmpty,
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: Text(AppLocalizations.of(context)!.submit),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class BlockedUsersScreen extends StatefulWidget {
+  const BlockedUsersScreen({super.key});
+
+  @override
+  State<BlockedUsersScreen> createState() => _BlockedUsersScreenState();
+}
+
+class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(AppLocalizations.of(context)!.blockedUsers),
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        foregroundColor: Theme.of(context).appBarTheme.foregroundColor,
+        elevation: Theme.of(context).appBarTheme.elevation,
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: currentUser != null
+            ? FirebaseFirestore.instance
+                  .collection('Users')
+                  .doc(currentUser.uid)
+                  .snapshots()
+            : null,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final blockedUsers =
+              (snapshot.data?.data() as Map<String, dynamic>?)?['blockedUsers']
+                  as List<dynamic>? ??
+              [];
+
+          if (blockedUsers.isEmpty) {
+            return Center(
+              child: Text(
+                AppLocalizations.of(context)!.noBlockedUsers,
+                style: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.7),
+                  fontSize: 16,
+                ),
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: blockedUsers.length,
+            itemBuilder: (context, index) {
+              final userId = blockedUsers[index];
+              return FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('Users')
+                    .doc(userId)
+                    .get(),
+                builder: (context, userSnapshot) {
+                  if (!userSnapshot.hasData) {
+                    return const ListTile(title: Text('Loading...'));
+                  }
+                  final userData =
+                      userSnapshot.data!.data() as Map<String, dynamic>;
+                  final email = userData['email'] ?? 'Unknown';
+                  final name =
+                      userData['displayName'] ??
+                      (email.contains('@') ? email.split('@')[0] : 'User');
+
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(name),
+                    subtitle: Text(email),
+                    trailing: IconButton(
+                      icon: Icon(
+                        Icons.remove_circle_outline,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      onPressed: () {
+                        _unblockUser(context, userId);
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _unblockUser(BuildContext context, String userId) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('Users')
+            .doc(currentUser.uid)
+            .update({
+              'blockedUsers': FieldValue.arrayRemove([userId]),
+            });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.userUnblocked),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "${AppLocalizations.of(context)!.errorUnblockingUser} ${e.toString()}",
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
